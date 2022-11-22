@@ -1,0 +1,5 @@
+flask
+boto3
+zappa
+awsudo
+awscli

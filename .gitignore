@@ -1,0 +1,5 @@
+zappa_settings.json
+venv/*
+.vscode
+.idea
+config.yml
