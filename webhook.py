@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import re
 import sys
 import argparse
 import yaml
@@ -63,30 +64,67 @@ def substitute_hyperlinks(text, link_format='html'):
     return text
 
 
-def parse_alert(alert):
-    title = f"Status: {alert['status']}"
+def parse_alert_message(notification_system, title, message):
+    if notification_system == 'telegram':
+        return f'<b>{title}</b>: {message}'
+    elif notification_system == 'discord':
+        return f'**{title}**: {message}'
+    else:
+        return f'{title}: {message}'
+
+
+def parse_alert(alert, notification_system):
+    title = alert['status'].upper()
     description = ''
 
     if 'name' in alert['labels']:
-        description += f"Instance: {alert['labels']['instance']} ({alert['labels']['name']})\n"
+        description += parse_alert_message(
+            notification_system,
+            'Instance',
+            f"{alert['labels']['instance']} ({alert['labels']['name']})\n"
+        )
     else:
-        description += f"Instance: {alert['labels']['instance']}\n"
+        description += parse_alert_message(
+            notification_system,
+            'Instance',
+            f"{alert['labels']['instance']}\n"
+        )
 
     if 'info' in alert['annotations']:
-        description += f"Info: {alert['annotations']['info']}\n"
+        description += parse_alert_message(
+            notification_system,
+            'Info',
+            f"{alert['annotations']['info']}\n"
+        )
 
     if 'summary' in alert['annotations']:
-        description += f"Summary: {alert['annotations']['summary']}\n"
+        description += parse_alert_message(
+            notification_system,
+            'Summary',
+            f"{alert['annotations']['summary']}\n"
+        )
 
     if 'description' in alert['annotations']:
-        description += f"Description: {alert['annotations']['description']}\n"
+        description += parse_alert_message(
+            notification_system,
+            'Description',
+            f"{alert['annotations']['description']}\n"
+        )
 
     if alert['status'] == 'resolved':
         correct_date = parser.parse(alert['endsAt']).strftime('%Y-%m-%d %H:%M:%S')
-        description += f'Resolved: {correct_date}'
+        description += parse_alert_message(
+            notification_system,
+            'Resolved',
+            correct_date
+        )
     elif alert['status'] == 'firing':
         correct_date = parser.parse(alert['startsAt']).strftime('%Y-%m-%d %H:%M:%S')
-        description += f'Started: {correct_date}'
+        description += parse_alert_message(
+            notification_system,
+            'Started',
+            correct_date
+        )
 
     return title, description
 
@@ -100,7 +138,15 @@ def send_discord_notification(severity, channel_id):
     embeds = []
 
     for alert in payload['alerts']:
-        title, description = parse_alert(alert)
+        title, description = parse_alert(alert, 'discord')
+
+        if alert['status'] == 'firing':
+            color = '#E01E5A'
+        else:
+            color = '#2EB67D'
+
+        color = color[1:]
+        color = int(color, 16)
 
         embeds.append(
             {
@@ -111,6 +157,7 @@ def send_discord_notification(severity, channel_id):
                     'name': icon_type,
                     'icon_url': icon_url
                 },
+                'color': color,
                 'timestamp': datetime.datetime.utcnow().isoformat()
             }
         )
@@ -142,27 +189,22 @@ def send_telegram_notification(severity, chat_id):
     responses = []
 
     for alert in payload['alerts']:
-        title, description = parse_alert(alert)
-        message = f'<b>Status: {title}</b>\n'
+        title, description = parse_alert(alert, 'telegram')
+        message = f'<b>{title}</b>\n\n'
         message += description
 
-        responses.append(
-            requests.post(
-                url=bot_url,
-                data={
-                    'chat_id': chat_id,
-                    'parse_mode': 'html',
-                    'text': message
-                }
-            )
+        response = requests.post(
+            url=bot_url,
+            data={
+                'chat_id': chat_id,
+                'parse_mode': 'html',
+                'text': message
+            }
         )
 
-    return make_response(jsonify(
-        {
-            'status': 'ok',
-            'responses': responses
-        }
-    ), 404)
+        responses.append(response.json())
+
+    return responses
 
 
 def discord_handler(severity):
@@ -203,15 +245,13 @@ def discord_handler(severity):
     discord_response = response.json()
 
     if response.status_code != 200:
-        return make_response(jsonify(
-            {
-                'status': 'error',
-                'msg': f'Failed to send Discord notification to channel id: {channel_id}',
-                'detail': discord_response
-            }
-        ), 500)
+        return {
+            'status': 'error',
+            'msg': f'Failed to send Discord notification to channel id: {channel_id}',
+            'detail': discord_response
+        }
 
-    return jsonify(discord_response)
+    return discord_response
 
 
 def telegram_handler(severity):
@@ -239,21 +279,9 @@ def telegram_handler(severity):
             }
         ), 404)
 
-    chat_id = ''
+    chat_id = config['telegram']['chat_id'][severity]
 
-    response = send_telegram_notification(severity, chat_id)
-    telegram_response = response.json()
-
-    if response.status_code != 200 or not telegram_response['ok']:
-        return make_response(jsonify(
-            {
-                'status': 'error',
-                'msg': f'Failed to send Telegram notification to chat id: {chat_id}',
-                'detail': telegram_response
-            }
-        ), 500)
-
-    return jsonify(telegram_response)
+    return send_telegram_notification(severity, chat_id)
 
 
 config = load_config()
@@ -295,7 +323,6 @@ def ping():
 def webhook_handler(severity):
     return make_response(jsonify(
         {
-            'status': 'ok',
             'discord': discord_handler(severity),
             'telegram': telegram_handler(severity)
         }
