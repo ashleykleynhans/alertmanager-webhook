@@ -1,4 +1,4 @@
-zappa_settings.json
+*.json
 venv/*
 .vscode
 .idea
