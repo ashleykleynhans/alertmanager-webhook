@@ -59,10 +59,10 @@ alertmanager_route:
   routes:
     - match:
         severity: webhook-critical
-        receiver: webhook-critical
+      receiver: webhook-critical
     - match:
         severity: webhook-warning
-        receiver: webhook-warning
+      receiver: webhook-warning
 
 alertmanager_receivers:
   - name: webhook-critical
