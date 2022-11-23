@@ -141,7 +141,10 @@ def send_discord_notification(severity, channel_id):
         title, description = parse_alert(alert, 'discord')
 
         if alert['status'] == 'firing':
-            color = '#E01E5A'
+            if severity == 'critical':
+                color = '#E01E5A'
+            else:
+                color = '#ECB22E'
         else:
             color = '#2EB67D'
 
