@@ -28,20 +28,66 @@ brew update
 brew upgrade python@3.9
 ```
 5. [Create a new Slack App](https://api.slack.com/start).
-6. Create your Slack channel where you want to receive your SNS notifications.
-7. Configure SNS to send notifications to that channel.
+6. Create your Slack channel where you want to receive your
+   Alertmanager notifications.
+7. Configure Alertmanager to send notifications to that channel.
 8. Create a configuration file called `config.yml` in the same directory
    as the webhook script that looks like this:
 ```yml
 ---
-slack:
-  token: "<SLACK_TOKEN>"
-  channel: bot-testing
+discord:
+   bot_token: YOUR_DISCORD_TOKEN
+   channel_id: YOUR_DISCORD_CHANNEL_ID
+   author:
+      name: Alertmanager
+      icon_url: https://www.clipartmax.com/png/small/118-1186067_prometheus-software-logo-prometheus-monitoring.png
+
+telegram:
+   bot_token: YOUR_TELEGRAM_BOT_TOKEN
+   chat_id:
+      warning: YOUR_TELEGRAM_WARNINGS_CHAT_ID
+      critical: YOUR_TELEGRAM_CRITICALS_CHAT_ID
 ```
 
 ## Alertmanager Configuration
+### Alertmanager
+```yaml
+alertmanager_route:
+  repeat_interval: 8736h
+  group_by: ['alertname', 'cluster', 'service']
+  receiver: webhook-warning
+  routes:
+    - match:
+        severity: webhook-critical
+        receiver: webhook-critical
+    - match:
+        severity: webhook-warning
+        receiver: webhook-warning
 
-TODO
+alertmanager_receivers:
+  - name: webhook-critical
+    webhook_configs:
+      - url: "https://1d602d00.execute-api.us-east-1.amazonaws.com/alertmanager/critical"
+        send_resolved: true
+  - name: webhook-warning
+    webhook_configs:
+       - url: "https://1d602d00.execute-api.us-east-1.amazonaws.com/alertmanager/warning"
+         send_resolved: true
+```
+### Promtheus Rules
+```yaml
+groups:
+  - name: haproxy.rules
+    rules:
+      - alert: HAProxyDown
+        expr: haproxy_up == 0
+        for: 5m
+        labels:
+          severity: webhook-critical
+        annotations:
+          summary: "HAProxy load balancer down"
+          description: "{{ $labels.job }} on {{ $labels.instance }} has been down for 5 minutes."
+```
 
 ## Testing your Webhook
 
@@ -58,10 +104,12 @@ ngrok http 8090
 3. Note that the ngrok URL will change if you stop ngrok and run it again,
    so keep it running in a separate terminal window, otherwise you will not
    be able to test your webhook successfully.
-4. Update your SNS webhook configuration to the URL that is displayed
+4. Update your Alertmanager webhook configuration to the URL that is displayed
 while ngrok is running **(be sure to use the https one)**.
-5. Trigger an SNS event to trigger the notification webhook.
-6. Check your Slack channel that you created for your SNS notifications.
+5. Trigger an Alertmanager event to trigger the notification webhook (this can
+   be done by running the `test.py` script provided within this project.
+6. Check your Discord and Telegram channels that you created for your Alertmanager
+   notifications.
 
 ## Deploy to AWS Lambda
 
@@ -82,7 +130,7 @@ pip3 install -r requirements.txt
 to configure your AWS Lambda deployment:
 ```json
 {
-    "sns": {
+    "alertmanager": {
         "app_function": "webhook.app",
         "aws_region": "us-east-1",
         "lambda_description": "Webhook to handle Alertmanager notifications",
@@ -102,7 +150,7 @@ to AWS Lambda (this is installed as part of the dependencies above):
 zappa deploy
 ```
 6. Take note of the URL that is returned by the `zappa deploy` command,
-eg. `https://1d602d00.execute-api.us-east-1.amazonaws.com/sns`
+eg. `https://1d602d00.execute-api.us-east-1.amazonaws.com/alertmanager`
    (obviously use your own and don't copy and paste this one, or your
 Webhook will not work).
 
@@ -126,13 +174,13 @@ zappa status
 8. Test your webhook by making a curl request to the URL that was returned
 by `zappa deploy`:
 ```
-curl https://1d602d00.execute-api.us-east-1.amazonaws.com/sns
+curl https://1d602d00.execute-api.us-east-1.amazonaws.com/alertmanager
 ```
 You should expect the following response:
 ```json
 {"status":"ok"}
 ```
-9. Update your Webhook URL in SNS to the one returned by the
+9. Update your Webhook URL in Alertmanager to the one returned by the
 `zappa deploy` command.
 10. You can view your logs by running:
 ```bash
