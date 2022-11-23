@@ -63,7 +63,7 @@ def substitute_hyperlinks(text, link_format='html'):
     return text
 
 
-def parse_alert(alert)
+def parse_alert(alert):
     title = f"Status: {alert['status']}"
     description = ''
 
