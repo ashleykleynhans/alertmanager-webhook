@@ -1,4 +1,4 @@
-# Alertmanager Webhook Receiver to send notifications to Slack and Telegram
+# Alertmanager Webhook Receiver to send notifications to Discord and Telegram
 
 [![Python Version: 3.9](
 https://img.shields.io/badge/Python%20application-v3.9-blue
@@ -27,8 +27,8 @@ brew link python@3.9
 brew update
 brew upgrade python@3.9
 ```
-5. [Create a new Slack App](https://api.slack.com/start).
-6. Create your Slack channel where you want to receive your
+5. [Create a new Discord App](https://discord.com/developers/applications).
+6. Create your Discord channel where you want to receive your
    Alertmanager notifications.
 7. Configure Alertmanager to send notifications to that channel.
 8. Create a configuration file called `config.yml` in the same directory
