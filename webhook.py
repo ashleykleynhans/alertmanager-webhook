@@ -257,22 +257,6 @@ def telegram_handler(severity):
 
 
 config = load_config()
-
-if 'slack' not in config:
-    print("'slack' section not found in config")
-    sys.exit(1)
-
-if 'token' not in config['slack']:
-    print("'token' not found in 'slack' section of config")
-    sys.exit(1)
-
-if 'url' in config['slack']:
-    slack_url = config['slack']['url'] + '/' + config['slack']['token']
-else:
-    slack_url = 'https://slack.com/api/chat.postMessage'
-
-slack_token = config['slack']['token']
-slack_channel = config['slack']['channel']
 app = Flask(__name__)
 
 
