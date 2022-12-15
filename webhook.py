@@ -107,7 +107,7 @@ def parse_alert(alert, notification_system):
         if alert['annotations']['summary'] == 'Ensure entire alerting pipeline is functional':
             return None, None
 
-        title = alert['annotations']['summary'].upper()
+        title = f"alert['status'] : alert['annotations']['summary']".upper()
 
     if 'description' in alert['annotations']:
         description += parse_alert_message(
