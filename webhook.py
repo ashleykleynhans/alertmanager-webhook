@@ -103,13 +103,6 @@ def parse_alert(alert, notification_system):
             f"{alert['annotations']['info']}\n"
         )
 
-    if 'log' in alert['labels']:
-        description += parse_alert_message(
-            notification_system,
-            'Log',
-            f"{alert['labels']['log']}\n"
-        )
-
     if 'summary' in alert['annotations']:
         if alert['annotations']['summary'] == 'Ensure entire alerting pipeline is functional':
             return None, None
@@ -120,11 +113,20 @@ def parse_alert(alert, notification_system):
             f"{alert['annotations']['summary']}\n"
         )
 
+        title = alert['annotations']['summary'].upper()
+
     if 'description' in alert['annotations']:
         description += parse_alert_message(
             notification_system,
             'Description',
             f"{alert['annotations']['description']}\n"
+        )
+
+    if 'log' in alert['labels']:
+        description += parse_alert_message(
+            notification_system,
+            'Log',
+            f"{alert['labels']['log']}\n"
         )
 
     if alert['status'] == 'resolved':
