@@ -104,6 +104,9 @@ def parse_alert(alert, notification_system):
         )
 
     if 'summary' in alert['annotations']:
+        if alert['annotations']['summary'] == 'Ensure entire alerting pipeline is functional':
+            return None, None
+
         description += parse_alert_message(
             notification_system,
             'Summary',
@@ -145,6 +148,13 @@ def send_discord_notification(severity, channel_id):
 
     for alert in payload['alerts']:
         title, description = parse_alert(alert, 'discord')
+
+        if title is None and description is None:
+            return make_response(jsonify(
+                {
+                    'status': 'ok'
+                }
+            ), 200)
 
         if alert['status'] == 'firing':
             if severity == 'critical':
