@@ -83,11 +83,17 @@ def parse_alert(alert, notification_system):
             'Instance',
             f"{alert['labels']['instance']} ({alert['labels']['name']})\n"
         )
-    else:
+    elif 'instance' in alert['labels']:
         description += parse_alert_message(
             notification_system,
             'Instance',
             f"{alert['labels']['instance']}\n"
+        )
+    elif 'node' in alert['labels']:
+        description += parse_alert_message(
+            notification_system,
+            'Node',
+            f"{alert['labels']['node']}\n"
         )
 
     if 'info' in alert['annotations']:
