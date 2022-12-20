@@ -153,11 +153,7 @@ def send_discord_notification(severity, channel_id):
         title, description = parse_alert(alert, 'discord')
 
         if title is None and description is None:
-            return make_response(jsonify(
-                {
-                    'status': 'ok'
-                }
-            ), 200)
+            return
 
         if alert['status'] == 'firing':
             if severity == 'critical':
@@ -184,7 +180,7 @@ def send_discord_notification(severity, channel_id):
             }
         )
 
-    return requests.post(
+    response = requests.post(
         url=bot_url,
         headers={
             'Content-Type': 'application/json',
@@ -194,6 +190,17 @@ def send_discord_notification(severity, channel_id):
             'embeds': embeds
         }
     )
+
+    discord_response = response.json()
+
+    if response.status_code != 200:
+        return {
+            'status': 'error',
+            'msg': f'Failed to send Discord notification to channel id: {channel_id}',
+            'detail': discord_response
+        }
+
+    return discord_response
 
 
 def send_telegram_notification(severity, chat_id):
@@ -268,17 +275,8 @@ def discord_handler(severity):
         ), 404)
 
     channel_id = config['discord']['channel_id']
-    response = send_discord_notification(severity, channel_id)
-    discord_response = response.json()
 
-    if response.status_code != 200:
-        return {
-            'status': 'error',
-            'msg': f'Failed to send Discord notification to channel id: {channel_id}',
-            'detail': discord_response
-        }
-
-    return discord_response
+    return send_discord_notification(severity, channel_id)
 
 
 def telegram_handler(severity):
