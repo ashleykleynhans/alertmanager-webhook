@@ -211,6 +211,11 @@ def send_telegram_notification(severity, chat_id):
     responses = []
 
     for alert in payload['alerts']:
+        if 'environment' in alert['labels'] \
+                and 'environment' in config['telegram'] \
+                and alert['labels']['environment'] != config['telegram']['environment']:
+            continue
+
         title, description = parse_alert(alert, 'telegram')
         message = f'<b>{title}</b>\n\n'
         message += description
