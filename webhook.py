@@ -77,6 +77,24 @@ def parse_alert(alert, notification_system):
     title = alert['status'].upper()
     description = ''
 
+    # Ignore the Watchdog alert that ensures that the alerting pipeline is functional
+    if 'alertname' in alert['labels'] and alert['labels']['alertname'] == 'Watchdog':
+        return None, None
+
+    if 'environment' in alert['labels']:
+        description += parse_alert_message(
+            notification_system,
+            'Environment',
+            f"{alert['labels']['environment']}\n"
+        )
+
+    if 'app' in alert['labels']:
+        description += parse_alert_message(
+            notification_system,
+            'App',
+            f"{alert['labels']['app']}\n"
+        )
+
     if 'name' in alert['labels']:
         description += parse_alert_message(
             notification_system,
@@ -104,9 +122,6 @@ def parse_alert(alert, notification_system):
         )
 
     if 'summary' in alert['annotations']:
-        if alert['annotations']['summary'] == 'Ensure entire alerting pipeline is functional':
-            return None, None
-
         title = f"{alert['status']} : {alert['annotations']['summary']}".upper()
 
     if 'description' in alert['annotations']:
