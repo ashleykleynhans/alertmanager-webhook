@@ -6,6 +6,7 @@ import argparse
 import yaml
 import requests
 import datetime
+import time
 from dateutil import parser
 from flask import Flask, request, jsonify, make_response
 
@@ -162,7 +163,7 @@ def send_discord_notification(severity, channel_id):
     icon_url = config['discord']['author']['icon_url']
     icon_type = config['discord']['author']['name']
     bot_url = f'https://discordapp.com/api/channels/{channel_id}/messages'
-    embeds = []
+    responses = []
 
     for alert in payload['alerts']:
         title, description = parse_alert(alert, 'discord')
@@ -181,7 +182,7 @@ def send_discord_notification(severity, channel_id):
         color = color[1:]
         color = int(color, 16)
 
-        embeds.append(
+        embeds = [
             {
                 'title': title,
                 'type': 'rich',
@@ -193,29 +194,42 @@ def send_discord_notification(severity, channel_id):
                 'color': color,
                 'timestamp': datetime.datetime.utcnow().isoformat()
             }
+        ]
+
+        response = requests.post(
+            url=bot_url,
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bot {bot_token}'
+            },
+            json={
+                'embeds': embeds
+            }
         )
 
-    response = requests.post(
-        url=bot_url,
-        headers={
-            'Content-Type': 'application/json',
-            'Authorization': f'Bot {bot_token}'
-        },
-        json={
-            'embeds': embeds
-        }
-    )
+        discord_response = response.json()
 
-    discord_response = response.json()
+        if response.status_code == 429:
+            retry_after = discord_response['retry_after']
+            print(f'Discord rate limiting in place, retrying after: {retry_after}')
+            time.sleep(retry_after)
 
-    if response.status_code != 200:
-        return {
-            'status': 'error',
-            'msg': f'Failed to send Discord notification to channel id: {channel_id}',
-            'detail': discord_response
-        }
+            response = requests.post(
+                url=bot_url,
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bot {bot_token}'
+                },
+                json={
+                    'embeds': embeds
+                }
+            )
+        elif response.status_code != 200:
+            print(f'Discord returned status code: {response.status_code}')
 
-    return discord_response
+        responses.append(discord_response)
+
+    return responses
 
 
 def send_telegram_notification(severity, chat_id):
