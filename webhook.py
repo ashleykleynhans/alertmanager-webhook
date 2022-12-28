@@ -224,6 +224,8 @@ def send_discord_notification(severity, channel_id):
                     'embeds': embeds
                 }
             )
+
+            discord_response = response.json()
         elif response.status_code != 200:
             print(f'Discord returned status code: {response.status_code}')
 
@@ -265,7 +267,27 @@ def send_telegram_notification(severity, chat_id):
             }
         )
 
-        responses.append(response.json())
+        telegram_response = response.json()
+
+        if response.status_code == 429:
+            retry_after = telegram_response['retry_after']
+            print(f'Telegram rate limiting in place, retrying after: {retry_after}')
+            time.sleep(retry_after)
+
+            response = requests.post(
+                url=bot_url,
+                data={
+                    'chat_id': chat_id,
+                    'parse_mode': 'html',
+                    'text': message
+                }
+            )
+
+            telegram_response = response.json()
+        elif response.status_code != 200:
+            print(f'Telegram returned status code: {response.status_code}')
+
+        responses.append(telegram_response)
 
     return responses
 
