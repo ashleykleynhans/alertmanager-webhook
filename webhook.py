@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import json
 import re
 import sys
 import argparse
@@ -13,7 +12,7 @@ from flask import Flask, request, jsonify, make_response
 
 def get_args():
     parser = argparse.ArgumentParser(
-        description='AWS SNS Webhook Receiver to Send Slack Notifications'
+        description='Alertmanager Webhook Receiver to Send Notifications to Discord and Telegram'
     )
 
     parser.add_argument(
@@ -41,6 +40,41 @@ def load_config():
     except FileNotFoundError:
         print(f'ERROR: Config file {config_file} not found!')
         sys.exit()
+
+
+def validate_config(conf):
+    if conf is None:
+        raise Exception('config.yml does not appear to contain any data')
+
+    if 'discord' not in conf and 'telegram' not in conf:
+        raise KeyError('Neither "discord" nor "telegram" found in config.yml')
+
+    if 'discord' in conf and 'bot_token' not in conf['discord']:
+        raise KeyError('"bot_token" not found under discord section of config.xml')
+
+    if 'telegram' in conf and 'bot_token' not in conf['telegram']:
+        raise KeyError('"bot_token" not found under telegram section of config.xml')
+
+    if 'discord' in conf and 'environments' not in conf['discord']:
+        raise KeyError('"environments" not found under discord section of config.xml')
+
+    if 'telegram' in conf and 'environments' not in conf['telegram']:
+        raise KeyError('"environments" not found under telegram section of config.xml')
+
+    if 'discord' in conf:
+        for env in conf['discord']['environments']:
+            for severity in conf['discord']['environments'][env]:
+                if 'channel_id' not in conf['discord']['environments'][env][severity]:
+                    raise KeyError(f'"channel_id" not found for severity {severity} for the {env} environment for Discord')
+
+                if 'author' not in conf['discord']['environments'][env][severity]:
+                    raise KeyError(f'"author" not found for severity {severity} for the {env} environment for Discord')
+
+    if 'telegram' in conf:
+        for env in conf['telegram']['environments']:
+            for severity in conf['telegram']['environments'][env]:
+                if 'chat_id' not in conf['telegram']['environments'][env][severity]:
+                    raise KeyError(f'"chat_id" not found for severity {severity} for the {env} environment for Telegram')
 
 
 def substitute_hyperlinks(text, link_format='html'):
@@ -157,19 +191,35 @@ def parse_alert(alert, notification_system):
     return title, description
 
 
-def send_discord_notification(severity, channel_id):
+def discord_handler(severity):
+    if 'discord' not in config:
+        return make_response(jsonify(
+            {
+                'status': 'error',
+                'msg': "'discord' section not found in config"
+            }
+        ), 404)
+
     payload = request.get_json()
     bot_token = config['discord']['bot_token']
-    icon_url = config['discord']['author']['icon_url']
-    icon_type = config['discord']['author']['name']
-    bot_url = f'https://discordapp.com/api/channels/{channel_id}/messages'
     responses = []
 
     for alert in payload['alerts']:
         title, description = parse_alert(alert, 'discord')
 
         if title is None and description is None:
-            return
+            continue
+
+        # environment label must be present
+        if 'environment' not in alert['labels']:
+            continue
+
+        environment = alert['labels']['environment']
+        discord_config = config['discord']['environments'][environment][severity]
+        channel_id = discord_config['channel_id']
+        bot_url = f'https://discordapp.com/api/channels/{channel_id}/messages'
+        icon_url = discord_config['author']['icon_url']
+        icon_type = discord_config['author']['name']
 
         if alert['status'] == 'firing':
             if severity == 'critical':
@@ -234,12 +284,12 @@ def send_discord_notification(severity, channel_id):
     return responses
 
 
-def send_telegram_notification(severity, chat_id):
-    if severity not in config['telegram']['chat_id']:
+def telegram_handler(severity):
+    if 'telegram' not in config:
         return make_response(jsonify(
             {
                 'status': 'error',
-                'msg': f"'{severity}' section not found in config"
+                'msg': "'telegram' section not found in config"
             }
         ), 404)
 
@@ -249,19 +299,31 @@ def send_telegram_notification(severity, chat_id):
     responses = []
 
     for alert in payload['alerts']:
-        if 'environment' in alert['labels'] \
-                and 'environment' in config['telegram'] \
-                and alert['labels']['environment'] != config['telegram']['environment']:
+        title, description = parse_alert(alert, 'telegram')
+
+        if title is None and description is None:
             continue
 
-        title, description = parse_alert(alert, 'telegram')
+        # environment label must be present
+        if 'environment' not in alert['labels']:
+            continue
+
+        environment = alert['labels']['environment']
+
+        if environment not in config['telegram']['environments']:
+            continue
+
+        if severity not in config['telegram']['environments'][environment]:
+            continue
+
+        telegram_config = config['telegram']['environments'][environment][severity]
         message = f'<b>{title}</b>\n\n'
         message += description
 
         response = requests.post(
             url=bot_url,
             data={
-                'chat_id': chat_id,
+                'chat_id': telegram_config['chat_id'],
                 'parse_mode': 'html',
                 'text': message
             }
@@ -277,7 +339,7 @@ def send_telegram_notification(severity, chat_id):
             response = requests.post(
                 url=bot_url,
                 data={
-                    'chat_id': chat_id,
+                    'chat_id': telegram_config['chat_id'],
                     'parse_mode': 'html',
                     'text': message
                 }
@@ -292,75 +354,8 @@ def send_telegram_notification(severity, chat_id):
     return responses
 
 
-def discord_handler(severity):
-    if 'discord' not in config:
-        return make_response(jsonify(
-            {
-                'status': 'error',
-                'msg': "'discord' section not found in config"
-            }
-        ), 404)
-
-    if 'bot_token' not in config['discord']:
-        return make_response(jsonify(
-            {
-                'status': 'error',
-                'msg': "'bot_token' section not found in 'discord' section of config"
-            }
-        ), 404)
-
-    if 'channel_id' not in config['discord']:
-        return make_response(jsonify(
-            {
-                'status': 'error',
-                'msg': "'channel_id' section not found in 'discord' section of config"
-            }
-        ), 404)
-
-    if 'author' not in config['discord']:
-        return make_response(jsonify(
-            {
-                'status': 'error',
-                'msg': "'author' section not found in 'discord' section of config"
-            }
-        ), 404)
-
-    channel_id = config['discord']['channel_id']
-
-    return send_discord_notification(severity, channel_id)
-
-
-def telegram_handler(severity):
-    if 'telegram' not in config:
-        return make_response(jsonify(
-            {
-                'status': 'error',
-                'msg': "'telegram' section not found in config"
-            }
-        ), 404)
-
-    if 'bot_token' not in config['telegram']:
-        return make_response(jsonify(
-            {
-                'status': 'error',
-                'msg': "'bot_token' section not found in 'telegram' section of config"
-            }
-        ), 404)
-
-    if 'chat_id' not in config['telegram']:
-        return make_response(jsonify(
-            {
-                'status': 'error',
-                'msg': "'chat_id' section not found in 'telegram' section of config"
-            }
-        ), 404)
-
-    chat_id = config['telegram']['chat_id'][severity]
-
-    return send_telegram_notification(severity, chat_id)
-
-
 config = load_config()
+validate_config(config)
 app = Flask(__name__)
 
 

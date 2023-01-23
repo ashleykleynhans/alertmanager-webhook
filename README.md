@@ -36,17 +36,39 @@ brew upgrade python@3.9
 ```yml
 ---
 discord:
-   bot_token: YOUR_DISCORD_TOKEN
-   channel_id: YOUR_DISCORD_CHANNEL_ID
-   author:
-      name: Alertmanager
-      icon_url: https://www.clipartmax.com/png/small/118-1186067_prometheus-software-logo-prometheus-monitoring.png
+  bot_token: YOUR_DISCORD_TOKEN
+  environments:
+    prod:
+      warning:
+        channel_id: YOUR_DISCORD_CHANNEL_ID
+        author:
+          name: Alertmanager
+          icon_url: https://www.clipartmax.com/png/small/118-1186067_prometheus-software-logo-prometheus-monitoring.png
+      critical:
+         channel_id: YOUR_DISCORD_CHANNEL_ID
+         author:
+            name: Alertmanager
+            icon_url: https://www.clipartmax.com/png/small/118-1186067_prometheus-software-logo-prometheus-monitoring.png
+    test:
+       warning:
+          channel_id: YOUR_DISCORD_CHANNEL_ID
+          author:
+             name: Alertmanager
+             icon_url: https://www.clipartmax.com/png/small/118-1186067_prometheus-software-logo-prometheus-monitoring.png
+       critical:
+          channel_id: YOUR_DISCORD_CHANNEL_ID
+          author:
+             name: Alertmanager
+             icon_url: https://www.clipartmax.com/png/small/118-1186067_prometheus-software-logo-prometheus-monitoring.png
 
 telegram:
-   bot_token: YOUR_TELEGRAM_BOT_TOKEN
-   chat_id:
-      warning: YOUR_TELEGRAM_WARNINGS_CHAT_ID
-      critical: YOUR_TELEGRAM_CRITICALS_CHAT_ID
+  bot_token: YOUR_TELEGRAM_BOT_TOKEN
+  environments:
+     prod:
+        warning:
+           chat_id: YOUR_TELEGRAM_WARNINGS_CHAT_ID
+        critical:
+           chat_id: YOUR_TELEGRAM_WARNINGS_CHAT_ID
 ```
 
 ## Alertmanager Configuration
