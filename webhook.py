@@ -65,16 +65,22 @@ def validate_config(conf):
         for env in conf['discord']['environments']:
             for severity in conf['discord']['environments'][env]:
                 if 'channel_id' not in conf['discord']['environments'][env][severity]:
-                    raise KeyError(f'"channel_id" not found for severity {severity} for the {env} environment for Discord')
+                    raise KeyError(f'"channel_id" not found for severity {severity} for the {env} environment for Discord in config.xml')
 
                 if 'author' not in conf['discord']['environments'][env][severity]:
-                    raise KeyError(f'"author" not found for severity {severity} for the {env} environment for Discord')
+                    raise KeyError(f'"author" not found for severity {severity} for the {env} environment for Discord in config.xml')
 
     if 'telegram' in conf:
         for env in conf['telegram']['environments']:
             for severity in conf['telegram']['environments'][env]:
                 if 'chat_id' not in conf['telegram']['environments'][env][severity]:
-                    raise KeyError(f'"chat_id" not found for severity {severity} for the {env} environment for Telegram')
+                    raise KeyError(f'"chat_id" not found for severity {severity} for the {env} environment for Telegram in config.xml')
+
+    if 'valid_environments' not in conf:
+        raise KeyError('"valid_environments" not found  in config.xml')
+
+    if 'default_environment' not in conf:
+        raise KeyError('"default_environment" not found  in config.xml')
 
 
 def substitute_hyperlinks(text, link_format='html'):
@@ -215,6 +221,11 @@ def discord_handler(severity):
             continue
 
         environment = alert['labels']['environment']
+
+        # No valid environment found in the alert, use the default instead
+        if environment not in config['valid_environments']:
+            environment = config['default_environment']
+
         discord_config = config['discord']['environments'][environment][severity]
         channel_id = discord_config['channel_id']
         bot_url = f'https://discordapp.com/api/channels/{channel_id}/messages'
@@ -309,6 +320,10 @@ def telegram_handler(severity):
             continue
 
         environment = alert['labels']['environment']
+
+        # No valid environment found in the alert, use the default instead
+        if environment not in config['valid_environments']:
+            environment = config['default_environment']
 
         if environment not in config['telegram']['environments']:
             continue
