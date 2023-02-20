@@ -69,6 +69,12 @@ telegram:
            chat_id: YOUR_TELEGRAM_WARNINGS_CHAT_ID
         critical:
            chat_id: YOUR_TELEGRAM_WARNINGS_CHAT_ID
+
+valid_environments:
+   - test
+   - prod
+
+default_environment: prod
 ```
 
 ## Alertmanager Configuration
