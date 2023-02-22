@@ -75,6 +75,10 @@ valid_environments:
    - prod
 
 default_environment: prod
+
+environment_mapping:
+  us-east-1: prod
+  us-east-2: test
 ```
 
 ## Alertmanager Configuration

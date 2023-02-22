@@ -82,6 +82,9 @@ def validate_config(conf):
     if 'default_environment' not in conf:
         raise KeyError('"default_environment" not found  in config.xml')
 
+    if 'environment_mapping' not in conf:
+        raise KeyError('"environment_mapping" not found  in config.xml')
+
 
 def substitute_hyperlinks(text, link_format='html'):
     pattern = '(<(https?:\/\/.*?)\|(.*?)>)'
@@ -224,6 +227,11 @@ def discord_handler(severity):
 
         # No valid environment found in the alert, use the default instead
         if environment not in config['valid_environments']:
+            for env in config['environment_mapping']:
+                if env in environment:
+                    environment = config['environment_mapping'][env]
+
+        if environment not in config['valid_environments']:
             environment = config['default_environment']
 
         discord_config = config['discord']['environments'][environment][severity]
@@ -322,6 +330,11 @@ def telegram_handler(severity):
         environment = alert['labels']['environment']
 
         # No valid environment found in the alert, use the default instead
+        if environment not in config['valid_environments']:
+            for env in config['environment_mapping']:
+                if env in environment:
+                    environment = config['environment_mapping'][env]
+
         if environment not in config['valid_environments']:
             environment = config['default_environment']
 
