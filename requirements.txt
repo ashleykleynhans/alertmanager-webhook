@@ -3,3 +3,4 @@ boto3
 zappa
 awsudo
 awscli
+requests==2.28.2
