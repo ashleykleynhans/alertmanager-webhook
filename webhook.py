@@ -344,14 +344,14 @@ def telegram_handler(severity):
         if severity not in config['telegram']['environments'][environment]:
             continue
 
-        telegram_config = config['telegram']['environments'][environment][severity]
+        chat_id = config['telegram']['environments'][environment][severity]['chat_id']
         message = f'<b>{title}</b>\n\n'
         message += description
 
         response = requests.post(
             url=bot_url,
             data={
-                'chat_id': telegram_config['chat_id'],
+                'chat_id': chat_id,
                 'parse_mode': 'html',
                 'text': message
             }
@@ -367,7 +367,7 @@ def telegram_handler(severity):
             response = requests.post(
                 url=bot_url,
                 data={
-                    'chat_id': telegram_config['chat_id'],
+                    'chat_id': chat_id,
                     'parse_mode': 'html',
                     'text': message
                 }
