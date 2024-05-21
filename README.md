@@ -1,4 +1,4 @@
-# Alertmanager Webhook Receiver to send notifications to Discord and Telegram
+# Alertmanager Webhook Receiver to send notifications to Discord, Telegram, and PagerDuty
 
 [![Python Version: 3.9](
 https://img.shields.io/badge/Python%20application-v3.9-blue
@@ -69,6 +69,13 @@ telegram:
            chat_id: YOUR_TELEGRAM_WARNINGS_CHAT_ID
         critical:
            chat_id: YOUR_TELEGRAM_WARNINGS_CHAT_ID
+
+pagerduty:
+   environments:
+      - prod
+   services:
+      default: f00df00df00df00df00df00df00df00d
+      website: d00fd00fd00fd00fd00fd00fd00fd00f
 
 valid_environments:
    - test
