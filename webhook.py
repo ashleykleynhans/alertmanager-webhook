@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 import re
 import sys
 import argparse
@@ -12,7 +13,7 @@ from flask import Flask, request, jsonify, make_response
 
 def get_args():
     parser = argparse.ArgumentParser(
-        description='Alertmanager Webhook Receiver to Send Notifications to Discord and Telegram'
+        description='Alertmanager Webhook Receiver to Send Notifications to Discord, Telegram and PagerDuty'
     )
 
     parser.add_argument(
@@ -50,40 +51,46 @@ def validate_config(conf):
         raise KeyError('Neither "discord" nor "telegram" found in config.yml')
 
     if 'discord' in conf and 'bot_token' not in conf['discord']:
-        raise KeyError('"bot_token" not found under discord section of config.xml')
+        raise KeyError('"bot_token" not found under discord section of config.yml')
 
     if 'telegram' in conf and 'bot_token' not in conf['telegram']:
-        raise KeyError('"bot_token" not found under telegram section of config.xml')
+        raise KeyError('"bot_token" not found under telegram section of config.yml')
 
     if 'discord' in conf and 'environments' not in conf['discord']:
-        raise KeyError('"environments" not found under discord section of config.xml')
+        raise KeyError('"environments" not found under discord section of config.yml')
 
     if 'telegram' in conf and 'environments' not in conf['telegram']:
-        raise KeyError('"environments" not found under telegram section of config.xml')
+        raise KeyError('"environments" not found under telegram section of config.yml')
+
+    if 'pagerduty' in conf and 'environments' not in conf['pagerduty']:
+        raise KeyError('"environments" not found under pagerduty section of config.yml')
+
+    if 'pagerduty' in conf and 'services' not in conf['pagerduty']:
+        raise KeyError('"services" not found under pagerduty section of config.yml')
 
     if 'discord' in conf:
         for env in conf['discord']['environments']:
             for severity in conf['discord']['environments'][env]:
                 if 'channel_id' not in conf['discord']['environments'][env][severity]:
-                    raise KeyError(f'"channel_id" not found for severity {severity} for the {env} environment for Discord in config.xml')
+                    raise KeyError(f'"channel_id" not found for severity {severity} for the {env} environment for Discord in config.yml')
 
                 if 'author' not in conf['discord']['environments'][env][severity]:
-                    raise KeyError(f'"author" not found for severity {severity} for the {env} environment for Discord in config.xml')
+                    raise KeyError(f'"author" not found for severity {severity} for the {env} environment for Discord in config.yml')
 
     if 'telegram' in conf:
         for env in conf['telegram']['environments']:
             for severity in conf['telegram']['environments'][env]:
                 if 'chat_id' not in conf['telegram']['environments'][env][severity]:
-                    raise KeyError(f'"chat_id" not found for severity {severity} for the {env} environment for Telegram in config.xml')
+                    raise KeyError(f'"chat_id" not found for severity {severity} for the {env} environment for Telegram in config.yml')
 
     if 'valid_environments' not in conf:
-        raise KeyError('"valid_environments" not found  in config.xml')
+        raise KeyError('"valid_environments" not found  in config.yml')
 
     if 'default_environment' not in conf:
-        raise KeyError('"default_environment" not found  in config.xml')
+        raise KeyError('"default_environment" not found  in config.yml')
 
     if 'environment_mapping' not in conf:
-        raise KeyError('"environment_mapping" not found  in config.xml')
+        raise KeyError('"environment_mapping" not found  in config.yml')
 
 
 def substitute_hyperlinks(text, link_format='html'):
@@ -113,6 +120,8 @@ def parse_alert_message(notification_system, title, message):
         return f'<b>{title}</b>: {message}'
     elif notification_system == 'discord':
         return f'**{title}**: {message}'
+    elif notification_system == 'pagerduty':
+        return f'{title}: {message}'
     else:
         return f'{title}: {message}'
 
@@ -120,10 +129,11 @@ def parse_alert_message(notification_system, title, message):
 def parse_alert(alert, notification_system):
     title = alert['status'].upper()
     description = ''
+    hostname = ''
 
     # Ignore the Watchdog alert that ensures that the alerting pipeline is functional
     if 'alertname' in alert['labels'] and alert['labels']['alertname'] == 'Watchdog':
-        return None, None
+        return None, None, None
 
     if 'environment' in alert['labels']:
         description += parse_alert_message(
@@ -139,23 +149,33 @@ def parse_alert(alert, notification_system):
             f"{alert['labels']['app']}\n"
         )
 
-    if 'name' in alert['labels']:
+    if 'nodename' in alert['labels']:
+        hostname = alert['labels']['nodename']
         description += parse_alert_message(
             notification_system,
             'Instance',
-            f"{alert['labels']['instance']} ({alert['labels']['name']})\n"
-        )
-    elif 'instance' in alert['labels']:
-        description += parse_alert_message(
-            notification_system,
-            'Instance',
-            f"{alert['labels']['instance']}\n"
+            f"{alert['labels']['nodename']}\n"
         )
     elif 'node' in alert['labels']:
+        hostname = alert['labels']['node']
         description += parse_alert_message(
             notification_system,
             'Node',
             f"{alert['labels']['node']}\n"
+        )
+    elif 'hostname' in alert['labels']:
+        hostname = alert['labels']['hostname']
+        description += parse_alert_message(
+            notification_system,
+            'Hostname',
+            f"{alert['labels']['hostname']}\n"
+        )
+    elif 'instance' in alert['labels']:
+        hostname = alert['labels']['instance']
+        description += parse_alert_message(
+            notification_system,
+            'Instance',
+            f"{alert['labels']['instance']}\n"
         )
 
     if 'info' in alert['annotations']:
@@ -182,14 +202,16 @@ def parse_alert(alert, notification_system):
             f"{alert['labels']['log']}\n"
         )
 
-    if alert['status'] == 'resolved':
+    status = alert['status']
+
+    if status == 'resolved':
         correct_date = parser.parse(alert['endsAt']).strftime('%Y-%m-%d %H:%M:%S')
         description += parse_alert_message(
             notification_system,
             'Resolved',
             correct_date
         )
-    elif alert['status'] == 'firing':
+    elif status == 'firing':
         correct_date = parser.parse(alert['startsAt']).strftime('%Y-%m-%d %H:%M:%S')
         description += parse_alert_message(
             notification_system,
@@ -197,24 +219,26 @@ def parse_alert(alert, notification_system):
             correct_date
         )
 
-    return title, description
+    return title, description, hostname, status
 
 
 def discord_handler(severity):
-    if 'discord' not in config:
+    notification_system = 'discord'
+
+    if notification_system not in config:
         return make_response(jsonify(
             {
                 'status': 'error',
-                'msg': "'discord' section not found in config"
+                'msg': f"'{notification_system}' section not found in config"
             }
         ), 404)
 
     payload = request.get_json()
-    bot_token = config['discord']['bot_token']
+    bot_token = config[notification_system]['bot_token']
     responses = []
 
     for alert in payload['alerts']:
-        title, description = parse_alert(alert, 'discord')
+        title, description, hostname, status = parse_alert(alert, notification_system)
 
         if title is None and description is None:
             continue
@@ -234,7 +258,7 @@ def discord_handler(severity):
         if environment not in config['valid_environments']:
             environment = config['default_environment']
 
-        discord_config = config['discord']['environments'][environment][severity]
+        discord_config = config[notification_system]['environments'][environment][severity]
         channel_id = discord_config['channel_id']
         bot_url = f'https://discordapp.com/api/channels/{channel_id}/messages'
         icon_url = discord_config['author']['icon_url']
@@ -304,21 +328,23 @@ def discord_handler(severity):
 
 
 def telegram_handler(severity):
-    if 'telegram' not in config:
+    notification_system = 'telegram'
+
+    if notification_system not in config:
         return make_response(jsonify(
             {
                 'status': 'error',
-                'msg': "'telegram' section not found in config"
+                'msg': f"'{notification_system}' section not found in config"
             }
         ), 404)
 
     payload = request.get_json()
-    bot_token = config['telegram']['bot_token']
+    bot_token = config[notification_system]['bot_token']
     bot_url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
     responses = []
 
     for alert in payload['alerts']:
-        title, description = parse_alert(alert, 'telegram')
+        title, description, hostname, status = parse_alert(alert, notification_system)
 
         if title is None and description is None:
             continue
@@ -338,13 +364,13 @@ def telegram_handler(severity):
         if environment not in config['valid_environments']:
             environment = config['default_environment']
 
-        if environment not in config['telegram']['environments']:
+        if environment not in config[notification_system]['environments']:
             continue
 
-        if severity not in config['telegram']['environments'][environment]:
+        if severity not in config[notification_system]['environments'][environment]:
             continue
 
-        chat_id = config['telegram']['environments'][environment][severity]['chat_id']
+        chat_id = config[notification_system]['environments'][environment][severity]['chat_id']
         message = f'<b>{title}</b>\n\n'
         message += description
 
@@ -378,6 +404,109 @@ def telegram_handler(severity):
             print(f'Telegram returned status code: {response.status_code}')
 
         responses.append(telegram_response)
+
+    return responses
+
+
+def pagerduty_handler(severity):
+    notification_system = 'pagerduty'
+    responses = []
+
+    if severity != 'critical':
+        return responses
+
+    if notification_system not in config:
+        return make_response(jsonify(
+            {
+                'status': 'error',
+                'msg': f"'{notification_system}' section not found in config"
+            }
+        ), 404)
+
+    payload = request.get_json()
+    url = 'https://events.pagerduty.com/v2/enqueue'
+
+    for alert in payload['alerts']:
+        title, description, hostname, status = parse_alert(alert, notification_system)
+
+        if title is None and description is None:
+            continue
+
+        # environment label must be present
+        if 'environment' not in alert['labels']:
+            continue
+
+        # Only continue if there is a new alert that is firing
+        if status == 'firing':
+            event_action = 'trigger'
+        else:
+            continue
+
+        environment = alert['labels']['environment']
+
+        # No valid environment found in the alert, use the default instead
+        if environment not in config['valid_environments']:
+            for env in config['environment_mapping']:
+                if env in environment:
+                    environment = config['environment_mapping'][env]
+
+        if environment not in config['valid_environments']:
+            environment = config['default_environment']
+
+        if environment not in config[notification_system]['environments']:
+            continue
+
+        pattern = r'^[a-zA-Z]+(?=[\.-])'
+        match = re.match(pattern, hostname)
+
+        if match:
+            service = match.group(0)
+        else:
+            service = 'default'
+
+        if service in config[notification_system]['services']:
+            routing_key = config[notification_system]['services'][service]
+        else:
+            routing_key = config[notification_system]['services']['default']
+
+        print(f'Service: {service}')
+        print(f'Routing Key: {routing_key}')
+
+        message = f'{title}\n\n'
+        message += description
+
+        payload = {
+            'payload': {
+                'summary': message,
+                'severity': severity,
+                'source': hostname
+            },
+            'routing_key': routing_key,
+            'event_action': event_action
+        }
+
+        response = requests.post(
+            url=url,
+            data=json.dumps(payload)
+        )
+
+        pagerduty_response = response.json()
+
+        if response.status_code == 429:
+            retry_after = pagerduty_response['retry_after']
+            print(f'PagerDuty rate limiting in place, retrying after: {retry_after}')
+            time.sleep(retry_after)
+
+            response = requests.post(
+                url=url,
+                data=json.dumps(payload)
+            )
+
+            pagerduty_response = response.json()
+        elif response.status_code != 200:
+            print(f'PagerDuty returned status code: {response.status_code}')
+
+        responses.append(pagerduty_response)
 
     return responses
 
@@ -423,7 +552,8 @@ def webhook_handler(severity):
     return make_response(jsonify(
         {
             'discord': discord_handler(severity),
-            'telegram': telegram_handler(severity)
+            'telegram': telegram_handler(severity),
+            'pagerduty': pagerduty_handler(severity)
         }
     ), 200)
 
