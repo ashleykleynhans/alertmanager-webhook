@@ -322,7 +322,7 @@ def discord_handler(severity):
 
         if response.status_code == 429:
             retry_after = discord_response['retry_after']
-            print(f'Discord rate limiting in place, retrying after: {retry_after}')
+            logging.info(f'Discord rate limiting in place, retrying after: {retry_after}')
             time.sleep(retry_after)
 
             response = requests.post(
@@ -338,7 +338,7 @@ def discord_handler(severity):
 
             discord_response = response.json()
         elif response.status_code != 200:
-            print(f'Discord returned status code: {response.status_code}')
+            logging.info(f'Discord returned status code: {response.status_code}')
 
         responses.append(discord_response)
 
@@ -405,7 +405,7 @@ def telegram_handler(severity):
 
         if response.status_code == 429:
             retry_after = telegram_response['retry_after']
-            print(f'Telegram rate limiting in place, retrying after: {retry_after}')
+            logging.info(f'Telegram rate limiting in place, retrying after: {retry_after}')
             time.sleep(retry_after)
 
             response = requests.post(
@@ -419,7 +419,7 @@ def telegram_handler(severity):
 
             telegram_response = response.json()
         elif response.status_code != 200:
-            print(f'Telegram returned status code: {response.status_code}')
+            logging.info(f'Telegram returned status code: {response.status_code}')
 
         responses.append(telegram_response)
 
