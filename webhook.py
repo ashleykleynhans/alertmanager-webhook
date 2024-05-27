@@ -7,8 +7,26 @@ import yaml
 import requests
 import datetime
 import time
+import logging
+import logging.handlers
 from dateutil import parser
 from flask import Flask, request, jsonify, make_response
+
+LOG_LEVEL = logging.DEBUG
+
+log_path = ''
+
+# Mac does not have permission to /var/log for example
+if sys.platform == 'linux':
+    log_path = '/var/log/'
+
+# Set the log level for the root logger
+logging.getLogger().setLevel(LOG_LEVEL)
+
+log_handler = logging.handlers.WatchedFileHandler(f'{log_path}alertmanager-webhook.log')
+formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
+log_handler.setFormatter(formatter)
+logging.getLogger().addHandler(log_handler)
 
 
 def get_args():
@@ -133,7 +151,7 @@ def parse_alert(alert, notification_system):
 
     # Ignore the Watchdog alert that ensures that the alerting pipeline is functional
     if 'alertname' in alert['labels'] and alert['labels']['alertname'] == 'Watchdog':
-        return None, None, None
+        return None, None, None, None
 
     if 'environment' in alert['labels']:
         description += parse_alert_message(
@@ -469,11 +487,19 @@ def pagerduty_handler(severity):
         else:
             routing_key = config[notification_system]['services']['default']
 
-        print(f'Service: {service}')
-        print(f'Routing Key: {routing_key}')
-
         message = f'{title}\n\n'
         message += description
+
+        logging.debug(f'[PAGERDUTY]: Severity: {severity}')
+        logging.debug(f'[PAGERDUTY]: Title: {title}')
+        logging.debug(f'[PAGERDUTY]: Description: {description}')
+        logging.debug(f'[PAGERDUTY]: Hostname: {hostname}')
+        logging.debug(f'[PAGERDUTY]: Status: {status}')
+        logging.debug(f'[PAGERDUTY]: Environment: {environment}')
+        logging.debug(f'[PAGERDUTY]: Service: {service}')
+        logging.debug(f'[PAGERDUTY]: Message: {message}')
+        logging.debug(f'[PAGERDUTY]: Routing Key: {routing_key}')
+        logging.debug(f'[PAGERDUTY]: Event Action: {event_action}')
 
         payload = {
             'payload': {
@@ -494,7 +520,7 @@ def pagerduty_handler(severity):
 
         if response.status_code == 429:
             retry_after = pagerduty_response['retry_after']
-            print(f'PagerDuty rate limiting in place, retrying after: {retry_after}')
+            logging.info(f'PagerDuty rate limiting in place, retrying after: {retry_after}')
             time.sleep(retry_after)
 
             response = requests.post(
@@ -504,7 +530,7 @@ def pagerduty_handler(severity):
 
             pagerduty_response = response.json()
         elif response.status_code != 200:
-            print(f'PagerDuty returned status code: {response.status_code}')
+            logging.info(f'PagerDuty returned status code: {response.status_code}')
 
         responses.append(pagerduty_response)
 
