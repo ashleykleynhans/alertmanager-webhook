@@ -23,10 +23,16 @@ if sys.platform == 'linux':
 # Set the log level for the root logger
 logging.getLogger().setLevel(LOG_LEVEL)
 
-log_handler = logging.handlers.WatchedFileHandler(f'{log_path}alertmanager-webhook.log')
+# Create a file handler
+# log_handler = logging.handlers.WatchedFileHandler(f'{log_path}alertmanager-webhook.log')
 formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
-log_handler.setFormatter(formatter)
-logging.getLogger().addHandler(log_handler)
+# log_handler.setFormatter(formatter)
+# logging.getLogger().addHandler(log_handler)
+
+# Create a stream handler for stdout
+stream_handler = logging.StreamHandler(sys.stdout)
+stream_handler.setFormatter(formatter)
+logging.getLogger().addHandler(stream_handler)
 
 
 def get_args():
