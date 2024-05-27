@@ -173,7 +173,14 @@ def parse_alert(alert, notification_system):
             f"{alert['labels']['app']}\n"
         )
 
-    if 'nodename' in alert['labels']:
+    if 'hostname' in alert['labels']:
+        hostname = alert['labels']['hostname']
+        description += parse_alert_message(
+            notification_system,
+            'Hostname',
+            f"{alert['labels']['hostname']}\n"
+        )
+    elif 'nodename' in alert['labels']:
         hostname = alert['labels']['nodename']
         description += parse_alert_message(
             notification_system,
@@ -186,13 +193,6 @@ def parse_alert(alert, notification_system):
             notification_system,
             'Node',
             f"{alert['labels']['node']}\n"
-        )
-    elif 'hostname' in alert['labels']:
-        hostname = alert['labels']['hostname']
-        description += parse_alert_message(
-            notification_system,
-            'Hostname',
-            f"{alert['labels']['hostname']}\n"
         )
     elif 'instance' in alert['labels']:
         hostname = alert['labels']['instance']
