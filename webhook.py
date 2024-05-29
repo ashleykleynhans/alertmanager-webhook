@@ -12,8 +12,7 @@ import logging.handlers
 from dateutil import parser
 from flask import Flask, request, jsonify, make_response
 
-LOG_LEVEL = logging.DEBUG
-
+log_level = logging.DEBUG
 log_path = ''
 
 # Mac does not have permission to /var/log for example
@@ -21,15 +20,10 @@ if sys.platform == 'linux':
     log_path = '/var/log/'
 
 # Set the log level for the root logger
-logging.getLogger().setLevel(LOG_LEVEL)
-
-# Create a file handler
-# log_handler = logging.handlers.WatchedFileHandler(f'{log_path}alertmanager-webhook.log')
-formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
-# log_handler.setFormatter(formatter)
-# logging.getLogger().addHandler(log_handler)
+logging.getLogger().setLevel(log_level)
 
 # Create a stream handler for stdout
+formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
 stream_handler = logging.StreamHandler(sys.stdout)
 stream_handler.setFormatter(formatter)
 logging.getLogger().addHandler(stream_handler)
@@ -448,6 +442,7 @@ def pagerduty_handler(severity):
         ), 404)
 
     payload = request.get_json()
+    logging.debug('[PAGERDUTY]: Payload: ' + json.dumps(payload, indent=4, default=str))
     url = 'https://events.pagerduty.com/v2/enqueue'
 
     for alert in payload['alerts']:
