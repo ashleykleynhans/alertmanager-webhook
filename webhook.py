@@ -148,6 +148,7 @@ def parse_alert(alert, notification_system):
     title = alert['status'].upper()
     description = ''
     hostname = ''
+    application = ''
 
     # Ignore the Watchdog alert that ensures that the alerting pipeline is functional
     if 'alertname' in alert['labels'] and alert['labels']['alertname'] == 'Watchdog':
@@ -161,6 +162,7 @@ def parse_alert(alert, notification_system):
         )
 
     if 'app' in alert['labels']:
+        application = alert['labels']['app']
         description += parse_alert_message(
             notification_system,
             'App',
@@ -237,7 +239,7 @@ def parse_alert(alert, notification_system):
             correct_date
         )
 
-    return title, description, hostname, status
+    return title, description, hostname, status, application
 
 
 def discord_handler(severity):
@@ -256,7 +258,7 @@ def discord_handler(severity):
     responses = []
 
     for alert in payload['alerts']:
-        title, description, hostname, status = parse_alert(alert, notification_system)
+        title, description, hostname, status, application = parse_alert(alert, notification_system)
 
         if title is None and description is None:
             continue
@@ -362,7 +364,7 @@ def telegram_handler(severity):
     responses = []
 
     for alert in payload['alerts']:
-        title, description, hostname, status = parse_alert(alert, notification_system)
+        title, description, hostname, status, application = parse_alert(alert, notification_system)
 
         if title is None and description is None:
             continue
@@ -429,6 +431,7 @@ def telegram_handler(severity):
 def pagerduty_handler(severity):
     notification_system = 'pagerduty'
     responses = []
+    logging.debug(f'[PAGERDUTY]: Severity: {severity}')
 
     if severity != 'critical':
         return responses
@@ -446,7 +449,12 @@ def pagerduty_handler(severity):
     url = 'https://events.pagerduty.com/v2/enqueue'
 
     for alert in payload['alerts']:
-        title, description, hostname, status = parse_alert(alert, notification_system)
+        title, description, hostname, status, application = parse_alert(alert, notification_system)
+
+        logging.debug(f'[PAGERDUTY]: Title: {title}')
+        logging.debug(f'[PAGERDUTY]: Description: {description}')
+        logging.debug(f'[PAGERDUTY]: Hostname: {hostname}')
+        logging.debug(f'[PAGERDUTY]: Status: {status}')
 
         if title is None and description is None:
             continue
@@ -472,6 +480,8 @@ def pagerduty_handler(severity):
         if environment not in config['valid_environments']:
             environment = config['default_environment']
 
+        logging.debug(f'[PAGERDUTY]: Environment: {environment}')
+
         if environment not in config[notification_system]['environments']:
             continue
 
@@ -480,6 +490,10 @@ def pagerduty_handler(severity):
 
         if match:
             service = match.group(0)
+        elif application in config[notification_system]['services']:
+            service = application
+        elif hostname in config[notification_system]['services']:
+            service = hostname
         else:
             service = 'default'
 
@@ -491,12 +505,6 @@ def pagerduty_handler(severity):
         message = f'{title}\n\n'
         message += description
 
-        logging.debug(f'[PAGERDUTY]: Severity: {severity}')
-        logging.debug(f'[PAGERDUTY]: Title: {title}')
-        logging.debug(f'[PAGERDUTY]: Description: {description}')
-        logging.debug(f'[PAGERDUTY]: Hostname: {hostname}')
-        logging.debug(f'[PAGERDUTY]: Status: {status}')
-        logging.debug(f'[PAGERDUTY]: Environment: {environment}')
         logging.debug(f'[PAGERDUTY]: Service: {service}')
         logging.debug(f'[PAGERDUTY]: Message: {message}')
         logging.debug(f'[PAGERDUTY]: Routing Key: {routing_key}')
