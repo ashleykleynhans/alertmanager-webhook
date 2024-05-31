@@ -261,10 +261,12 @@ def discord_handler(severity):
         title, description, hostname, status, application = parse_alert(alert, notification_system)
 
         if title is None and description is None:
+            logging.info('[DISCORD]: No title or description, no notification will be sent')
             continue
 
         # environment label must be present
         if 'environment' not in alert['labels']:
+            logging.info('[DISCORD]: No environment label, no notification will be sent')
             continue
 
         environment = alert['labels']['environment']
@@ -324,7 +326,7 @@ def discord_handler(severity):
 
         if response.status_code == 429:
             retry_after = discord_response['retry_after']
-            logging.info(f'Discord rate limiting in place, retrying after: {retry_after}')
+            logging.warning(f'[DISCORD]: API rate limiting in place, retrying after: {retry_after}')
             time.sleep(retry_after)
 
             response = requests.post(
@@ -340,7 +342,7 @@ def discord_handler(severity):
 
             discord_response = response.json()
         elif response.status_code != 200:
-            logging.info(f'Discord returned status code: {response.status_code}')
+            logging.error(f'[DISCORD]: API returned status code: {response.status_code}')
 
         responses.append(discord_response)
 
@@ -367,10 +369,12 @@ def telegram_handler(severity):
         title, description, hostname, status, application = parse_alert(alert, notification_system)
 
         if title is None and description is None:
+            logging.info('[TELEGRAM]: No title or description, no notification will be sent')
             continue
 
         # environment label must be present
         if 'environment' not in alert['labels']:
+            logging.info('[TELEGRAM]: No environment label, no notification will be sent')
             continue
 
         environment = alert['labels']['environment']
@@ -407,7 +411,7 @@ def telegram_handler(severity):
 
         if response.status_code == 429:
             retry_after = telegram_response['retry_after']
-            logging.info(f'Telegram rate limiting in place, retrying after: {retry_after}')
+            logging.warning(f'[TELEGRAM]: API rate limiting in place, retrying after: {retry_after}')
             time.sleep(retry_after)
 
             response = requests.post(
@@ -421,7 +425,7 @@ def telegram_handler(severity):
 
             telegram_response = response.json()
         elif response.status_code != 200:
-            logging.info(f'Telegram returned status code: {response.status_code}')
+            logging.error(f'[TELEGRAM]: API returned status code: {response.status_code}')
 
         responses.append(telegram_response)
 
@@ -431,7 +435,6 @@ def telegram_handler(severity):
 def pagerduty_handler(severity):
     notification_system = 'pagerduty'
     responses = []
-    logging.debug(f'[PAGERDUTY]: Severity: {severity}')
 
     if severity != 'critical':
         return responses
@@ -445,28 +448,26 @@ def pagerduty_handler(severity):
         ), 404)
 
     payload = request.get_json()
-    logging.debug('[PAGERDUTY]: Payload: ' + json.dumps(payload, indent=4, default=str))
     url = 'https://events.pagerduty.com/v2/enqueue'
 
     for alert in payload['alerts']:
         title, description, hostname, status, application = parse_alert(alert, notification_system)
 
-        logging.debug(f'[PAGERDUTY]: Title: {title}')
-        logging.debug(f'[PAGERDUTY]: Description: {description}')
-        logging.debug(f'[PAGERDUTY]: Hostname: {hostname}')
-        logging.debug(f'[PAGERDUTY]: Status: {status}')
-
         if title is None and description is None:
+            logging.info('[PAGERDUTY]: No title or description, no notification will be sent')
             continue
 
         # environment label must be present
         if 'environment' not in alert['labels']:
+            logging.info('[PAGERDUTY]: No environment label, no notification will be sent')
             continue
 
         # Only continue if there is a new alert that is firing
         if status == 'firing':
+            logging.info('[PAGERDUTY]: Status is firing, incident will be triggered')
             event_action = 'trigger'
         else:
+            logging.info('[PAGERDUTY]: Status is not firing, no incident will be triggered')
             continue
 
         environment = alert['labels']['environment']
@@ -506,9 +507,7 @@ def pagerduty_handler(severity):
         message += description
 
         logging.debug(f'[PAGERDUTY]: Service: {service}')
-        logging.debug(f'[PAGERDUTY]: Message: {message}')
         logging.debug(f'[PAGERDUTY]: Routing Key: {routing_key}')
-        logging.debug(f'[PAGERDUTY]: Event Action: {event_action}')
 
         payload = {
             'payload': {
@@ -529,7 +528,7 @@ def pagerduty_handler(severity):
 
         if response.status_code == 429:
             retry_after = pagerduty_response['retry_after']
-            logging.info(f'PagerDuty rate limiting in place, retrying after: {retry_after}')
+            logging.warning(f'[PAGERDUTY]: API rate limiting in place, retrying after: {retry_after}')
             time.sleep(retry_after)
 
             response = requests.post(
@@ -538,8 +537,9 @@ def pagerduty_handler(severity):
             )
 
             pagerduty_response = response.json()
-        elif response.status_code != 200:
-            logging.info(f'PagerDuty returned status code: {response.status_code}')
+        # PagerDuty usually returns HTTP status code 202
+        elif response.status_code != 200 and response.status_code != 202:
+            logging.error(f'[PAGERDUTY]: API returned status code: {response.status_code}')
 
         responses.append(pagerduty_response)
 

@@ -1,8 +1,8 @@
 # Alertmanager Webhook Receiver to send notifications to Discord, Telegram, and PagerDuty
 
-[![Python Version: 3.9](
-https://img.shields.io/badge/Python%20application-v3.9-blue
-)](https://www.python.org/downloads/release/python-3913/)
+[![Python Version: 3.12](
+https://img.shields.io/badge/Python%20application-v3.12-blue
+)](https://www.python.org/downloads/release/python-3123/)
 [![License: GPL 3.0](
 https://img.shields.io/github/license/ashleykleynhans/alertmanager-webhook
 )](https://opensource.org/licenses/GPL-3.0)
@@ -13,25 +13,20 @@ https://img.shields.io/github/license/ashleykleynhans/alertmanager-webhook
 ```bash
 brew install ngrok
 ```
-2. Ensure your System Python3 version is 3.9, but greater than 3.9.1.
+2. Ensure your System Python3 version is 3.12.
 ```bash
 python3 -V
 ```
-3. If your System Python is not 3.9:
+3. If your System Python is not 3.12:
 ```bash
-brew install python@3.9
-brew link python@3.9
+brew install python@3.12
+brew link python@3.12
 ```
-4. If your System Python is 3.9 but not greater than 3.9.1:
-```bash
-brew update
-brew upgrade python@3.9
-```
-5. [Create a new Discord App](https://discord.com/developers/applications).
-6. Create your Discord channel where you want to receive your
+4. [Create a new Discord App](https://discord.com/developers/applications).
+5. Create your Discord channel where you want to receive your
    Alertmanager notifications.
-7. Configure Alertmanager to send notifications to that channel.
-8. Create a configuration file called `config.yml` in the same directory
+6. Configure Alertmanager to send notifications to that channel.
+7. Create a configuration file called `config.yml` in the same directory
    as the webhook script that looks like this:
 ```yml
 ---
@@ -113,7 +108,7 @@ alertmanager_receivers:
        - url: "https://1d602d00.execute-api.us-east-1.amazonaws.com/alertmanager/warning"
          send_resolved: true
 ```
-### Promtheus Rules
+### Prometheus Rules
 ```yaml
 groups:
   - name: haproxy.rules
@@ -152,10 +147,10 @@ while ngrok is running **(be sure to use the https one)**.
 
 ## Deploy to AWS Lambda
 
-1. Create a Python 3.9 Virtual Environment:
+1. Create a Python 3.12 Virtual Environment:
 ```bash
-python3 -m venv venv/py3.9
-source venv/py3.9/bin/activate
+python3 -m venv venv/py3.12
+source venv/py3.12/bin/activate
 ```
 2. Upgrade pip.
 ```bash
@@ -175,7 +170,7 @@ to configure your AWS Lambda deployment:
         "lambda_description": "Webhook to handle Alertmanager notifications",
         "profile_name": "default",
         "project_name": "alertmanager-webhook",
-        "runtime": "python3.9",
+        "runtime": "python3.12",
         "s3_bucket": "alertmanager-webhooks",
         "tags": {
             "service": "alertmanager-webhook"
