@@ -4,5 +4,4 @@ zappa
 awsudo
 awscli
 setuptools
-urllib3==1.26.18
-requests==2.32.0
+requests
