@@ -152,7 +152,7 @@ def parse_alert(alert, notification_system):
 
     # Ignore the Watchdog alert that ensures that the alerting pipeline is functional
     if 'alertname' in alert['labels'] and alert['labels']['alertname'] == 'Watchdog':
-        return None, None, None, None
+        return None, None, None, None, None
 
     if 'environment' in alert['labels']:
         description += parse_alert_message(
