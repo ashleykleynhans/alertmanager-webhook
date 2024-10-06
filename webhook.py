@@ -509,6 +509,10 @@ def pagerduty_handler(severity):
         logging.debug(f'[PAGERDUTY]: Service: {service}')
         logging.debug(f'[PAGERDUTY]: Routing Key: {routing_key}')
 
+        # PagerDuty source field cannot be empty
+        if not len(hostname):
+            hostname = 'none'
+
         payload = {
             'payload': {
                 'summary': message,
