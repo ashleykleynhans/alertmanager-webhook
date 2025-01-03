@@ -210,8 +210,10 @@ def parse_alert_message(notification_system: str, title: str, message: str) -> s
 
 def parse_alert(
     alert: Dict[str, Any],
+    default_severity: str,
     notification_system: str
 ) -> Tuple[
+    Optional[str],
     Optional[str],
     Optional[str],
     Optional[str],
@@ -224,6 +226,7 @@ def parse_alert(
 
     Args:
         alert: Alert data dictionary from Alertmanager
+        default_severity: Default severity in the POST URL
         notification_system: Type of notification system to format for
 
     Returns:
@@ -234,16 +237,16 @@ def parse_alert(
             - status: Alert status
             - application: Application name
             - environment: Environment name
+            - severity: Alert severity
     """
     title = alert['status'].upper()
     description = ''
     hostname = ''
     application = ''
-    runbook_url = ''
 
     # Ignore the Watchdog alert
     if 'alertname' in alert['labels'] and alert['labels']['alertname'] == 'Watchdog':
-        return None, None, None, None, None, None
+        return None, None, None, None, None, None, None
 
     if 'environment' in alert['labels']:
         description += parse_alert_message(
@@ -288,6 +291,11 @@ def parse_alert(
             'Instance',
             f"{alert['labels']['instance']}\n"
         )
+
+    if 'severity' in alert['labels']:
+        severity = alert['labels']['severity']
+    else:
+        severity = default_severity
 
     if 'info' in alert['annotations']:
         description += parse_alert_message(
@@ -355,15 +363,15 @@ def parse_alert(
             logging.info('[DISCORD]: Invalid environment, falling back to default environment')
             environment = config['default_environment']
 
-    return title, description, hostname, status, application, environment
+    return title, description, hostname, status, application, environment, severity
 
 
-def discord_handler(severity: str):
+def discord_handler(default_severity: str):
     """
     Handle Discord notifications for alerts.
 
     Args:
-        severity: Alert severity level
+        default_severity: Default alert severity level
 
     Returns:
         List[Dict[str, Any]]: List of Discord API responses
@@ -383,7 +391,8 @@ def discord_handler(severity: str):
     responses: List[Dict[str, Any]] = []
 
     for alert in payload['alerts']:
-        title, description, hostname, status, application, environment = parse_alert(alert, notification_system)
+        (title, description, hostname, status, application,
+         environment, severity) = parse_alert(alert, default_severity, notification_system)
 
         if title is None and description is None:
             logging.info('[DISCORD]: No title or description, no notification will be sent')
@@ -462,12 +471,12 @@ def discord_handler(severity: str):
     return responses
 
 
-def telegram_handler(severity: str):
+def telegram_handler(default_severity: str):
     """
     Handle Telegram notifications for alerts.
 
     Args:
-        severity: Alert severity level
+        default_severity: Default alert severity level
 
     Returns:
         List[Dict[str, Any]]: List of Telegram API responses
@@ -488,7 +497,8 @@ def telegram_handler(severity: str):
     responses = []
 
     for alert in payload['alerts']:
-        title, description, hostname, status, application, environment = parse_alert(alert, notification_system)
+        (title, description, hostname, status, application,
+         environment, severity) = parse_alert(alert, default_severity, notification_system)
 
         if title is None and description is None:
             logging.info('[TELEGRAM]: No title or description, no notification will be sent')
@@ -538,21 +548,18 @@ def telegram_handler(severity: str):
     return responses
 
 
-def pagerduty_handler(severity: str):
+def pagerduty_handler(default_severity: str):
     """
     Handle PagerDuty notifications for critical alerts.
 
     Args:
-        severity: Alert severity level
+        default_severity: Default alert severity level
 
     Returns:
         List[Dict[str, Any]]: List of Telegram API responses
     """
     notification_system = 'pagerduty'
     responses = []
-
-    if severity != 'critical':
-        return responses
 
     if notification_system not in config:
         return make_response(jsonify(
@@ -566,7 +573,13 @@ def pagerduty_handler(severity: str):
     url = 'https://events.pagerduty.com/v2/enqueue'
 
     for alert in payload['alerts']:
-        title, description, hostname, status, application, environment = parse_alert(alert, notification_system)
+        (title, description, hostname, status, application,
+         environment, severity) = parse_alert(alert, default_severity, notification_system)
+
+        # PagerDuty is only triggered when the severity of the alert = critical
+        if severity != 'critical':
+            logging.info(f'[PAGERDUTY]: Severity = {severity} (not critical), no notification will be sent')
+            return responses
 
         if title is None and description is None:
             logging.info('[PAGERDUTY]: No title or description, no notification will be sent')
