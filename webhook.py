@@ -351,13 +351,15 @@ def discord_handler(severity: str):
 
         environment = alert['labels']['environment']
 
-        # No valid environment found in the alert, use the default instead
+        # Check for partial environment match if the full environment is not matched
         if environment not in config['valid_environments']:
             for env in config['environment_mapping']:
                 if env in environment:
                     environment = config['environment_mapping'][env]
 
+        # No valid environment found in the alert, use the default instead
         if environment not in config['valid_environments']:
+            logging.info('[DISCORD]: Invalid environment, falling back to default environment')
             environment = config['default_environment']
 
         discord_config = config[notification_system]['environments'][environment][severity]
@@ -472,13 +474,15 @@ def telegram_handler(severity: str):
 
         environment = alert['labels']['environment']
 
-        # No valid environment found in the alert, use the default instead
+        # Check for partial environment match if the full environment is not matched
         if environment not in config['valid_environments']:
             for env in config['environment_mapping']:
                 if env in environment:
                     environment = config['environment_mapping'][env]
 
+        # No valid environment found in the alert, use the default instead
         if environment not in config['valid_environments']:
+            logging.info('[TELEGRAM]: Invalid environment, falling back to default environment')
             environment = config['default_environment']
 
         if environment not in config[notification_system]['environments']:
@@ -574,13 +578,15 @@ def pagerduty_handler(severity: str):
 
         environment = alert['labels']['environment']
 
-        # No valid environment found in the alert, use the default instead
+        # Check for partial environment match if the full environment is not matched
         if environment not in config['valid_environments']:
             for env in config['environment_mapping']:
                 if env in environment:
                     environment = config['environment_mapping'][env]
 
+        # No valid environment found in the alert, use the default instead
         if environment not in config['valid_environments']:
+            logging.info('[PAGERDUTY]: Invalid environment, falling back to default environment')
             environment = config['default_environment']
 
         logging.debug(f'[PAGERDUTY]: Environment: {environment}')
