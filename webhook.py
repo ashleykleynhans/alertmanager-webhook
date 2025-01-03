@@ -288,11 +288,15 @@ def discord_handler(severity):
 
         if alert['status'] == 'firing':
             if severity == 'critical':
-                color = '#E01E5A'
+                color = '#E01E5A'   # Red - Critical
+            elif severity == 'warning':
+                color = '#ECB22E'   # Yellow - Warning
+            elif severity == 'info':
+                color = '#36C5F0'   # Blue - Info
             else:
-                color = '#ECB22E'
+                color = '#ECB22E'   # Default to yellow if severity unknown
         else:
-            color = '#2EB67D'
+            color = '#2EB67D'       # Green - Resolved
 
         color = color[1:]
         color = int(color, 16)

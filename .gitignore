@@ -4,3 +4,4 @@ venv/*
 .idea
 config.yml
 test*
+.DS_Store
