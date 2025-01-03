@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Alertmanager Webhook Receiver to Send Notifications to Discord, Telegram and PagerDuty.
+Handles incoming webhooks from Alertmanager and routes them to appropriate notification services.
+"""
+
 import json
 import re
 import sys
@@ -10,10 +15,11 @@ import time
 import logging
 import logging.handlers
 from dateutil import parser
+from typing import Dict, List, Tuple, Optional, Any, Union
 from flask import Flask, request, jsonify, make_response
 
-log_level = logging.DEBUG
-log_path = ''
+log_level: int = logging.DEBUG
+log_path: str = ''
 
 # Mac does not have permission to /var/log for example
 if sys.platform == 'linux':
@@ -23,13 +29,19 @@ if sys.platform == 'linux':
 logging.getLogger().setLevel(log_level)
 
 # Create a stream handler for stdout
-formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
-stream_handler = logging.StreamHandler(sys.stdout)
+formatter: logging.Formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
+stream_handler: logging.StreamHandler = logging.StreamHandler(sys.stdout)
 stream_handler.setFormatter(formatter)
 logging.getLogger().addHandler(stream_handler)
 
 
-def get_args():
+def get_args() -> argparse.Namespace:
+    """
+    Parse command line arguments for the webhook receiver.
+
+    Returns:
+        argparse.Namespace: Parsed command line arguments containing host and port
+    """
     parser = argparse.ArgumentParser(
         description='Alertmanager Webhook Receiver to Send Notifications to Discord, Telegram and PagerDuty'
     )
@@ -50,7 +62,16 @@ def get_args():
     return parser.parse_args()
 
 
-def load_config():
+def load_config() -> Dict[str, Any]:
+    """
+    Load configuration from config.yml file.
+
+    Returns:
+        Dict[str, Any]: Configuration dictionary
+
+    Raises:
+        FileNotFoundError: If config file is not found
+    """
     try:
         config_file = 'config.yml'
 
@@ -61,7 +82,17 @@ def load_config():
         sys.exit()
 
 
-def validate_config(conf):
+def validate_config(conf: Optional[Dict[str, Any]]) -> None:
+    """
+    Validate the configuration file structure and required fields.
+
+    Args:
+        conf: Configuration dictionary to validate
+
+    Raises:
+        Exception: If config is empty
+        KeyError: If required configuration keys are missing
+    """
     if conf is None:
         raise Exception('config.yml does not appear to contain any data')
 
@@ -102,16 +133,29 @@ def validate_config(conf):
                     raise KeyError(f'"chat_id" not found for severity {severity} for the {env} environment for Telegram in config.yml')
 
     if 'valid_environments' not in conf:
-        raise KeyError('"valid_environments" not found  in config.yml')
+        raise KeyError('"valid_environments" not found in config.yml')
 
     if 'default_environment' not in conf:
-        raise KeyError('"default_environment" not found  in config.yml')
+        raise KeyError('"default_environment" not found in config.yml')
 
     if 'environment_mapping' not in conf:
-        raise KeyError('"environment_mapping" not found  in config.yml')
+        raise KeyError('"environment_mapping" not found in config.yml')
 
 
-def substitute_hyperlinks(text, link_format='html'):
+def substitute_hyperlinks(text: str, link_format: str = 'html') -> str:
+    """
+    Convert Slack-style hyperlinks to HTML or Markdown format.
+
+    Args:
+        text: Text containing Slack-style hyperlinks
+        link_format: Format to convert links to ('html' or 'markdown')
+
+    Returns:
+        str: Text with converted hyperlinks
+
+    Raises:
+        Exception: If link_format is not supported
+    """
     pattern = '(<(https?:\/\/.*?)\|(.*?)>)'
     matches = re.findall(pattern, text)
 
@@ -133,7 +177,18 @@ def substitute_hyperlinks(text, link_format='html'):
     return text
 
 
-def parse_alert_message(notification_system, title, message):
+def parse_alert_message(notification_system: str, title: str, message: str) -> str:
+    """
+    Format alert message according to notification system requirements.
+
+    Args:
+        notification_system: Type of notification system ('telegram', 'discord', or 'pagerduty')
+        title: Alert title
+        message: Alert message content
+
+    Returns:
+        str: Formatted message string
+    """
     if notification_system == 'telegram':
         return f'<b>{title}</b>: {message}'
     elif notification_system == 'discord':
@@ -144,13 +199,29 @@ def parse_alert_message(notification_system, title, message):
         return f'{title}: {message}'
 
 
-def parse_alert(alert, notification_system):
+def parse_alert(alert: Dict[str, Any], notification_system: str)\
+        -> Tuple[Optional[str], Optional[str],Optional[str], Optional[str], Optional[str]]:
+    """
+    Parse alert data into a formatted message.
+
+    Args:
+        alert: Alert data dictionary from Alertmanager
+        notification_system: Type of notification system to format for
+
+    Returns:
+        Tuple containing:
+            - title: Alert title (or None if alert should be ignored)
+            - description: Formatted alert description (or None if alert should be ignored)
+            - hostname: Source hostname
+            - status: Alert status
+            - application: Application name
+    """
     title = alert['status'].upper()
     description = ''
     hostname = ''
     application = ''
 
-    # Ignore the Watchdog alert that ensures that the alerting pipeline is functional
+    # Ignore the Watchdog alert
     if 'alertname' in alert['labels'] and alert['labels']['alertname'] == 'Watchdog':
         return None, None, None, None, None
 
@@ -242,7 +313,16 @@ def parse_alert(alert, notification_system):
     return title, description, hostname, status, application
 
 
-def discord_handler(severity):
+def discord_handler(severity: str):
+    """
+    Handle Discord notifications for alerts.
+
+    Args:
+        severity: Alert severity level
+
+    Returns:
+        List[Dict[str, Any]]: List of Discord API responses
+    """
     notification_system = 'discord'
 
     if notification_system not in config:
@@ -253,9 +333,9 @@ def discord_handler(severity):
             }
         ), 404)
 
-    payload = request.get_json()
-    bot_token = config[notification_system]['bot_token']
-    responses = []
+    payload: Dict[str, Any] = request.get_json()
+    bot_token: str = config[notification_system]['bot_token']
+    responses: List[Dict[str, Any]] = []
 
     for alert in payload['alerts']:
         title, description, hostname, status, application = parse_alert(alert, notification_system)
@@ -281,10 +361,10 @@ def discord_handler(severity):
             environment = config['default_environment']
 
         discord_config = config[notification_system]['environments'][environment][severity]
-        channel_id = discord_config['channel_id']
-        bot_url = f'https://discordapp.com/api/channels/{channel_id}/messages'
-        icon_url = discord_config['author']['icon_url']
-        icon_type = discord_config['author']['name']
+        channel_id: str = discord_config['channel_id']
+        bot_url: str = f'https://discordapp.com/api/channels/{channel_id}/messages'
+        icon_url: str = discord_config['author']['icon_url']
+        icon_type: str = discord_config['author']['name']
 
         if alert['status'] == 'firing':
             if severity == 'critical':
@@ -353,7 +433,16 @@ def discord_handler(severity):
     return responses
 
 
-def telegram_handler(severity):
+def telegram_handler(severity: str):
+    """
+    Handle Telegram notifications for alerts.
+
+    Args:
+        severity: Alert severity level
+
+    Returns:
+        List[Dict[str, Any]]: List of Telegram API responses
+    """
     notification_system = 'telegram'
 
     if notification_system not in config:
@@ -436,7 +525,16 @@ def telegram_handler(severity):
     return responses
 
 
-def pagerduty_handler(severity):
+def pagerduty_handler(severity: str):
+    """
+    Handle PagerDuty notifications for critical alerts.
+
+    Args:
+        severity: Alert severity level
+
+    Returns:
+        List[Dict[str, Any]]: List of Telegram API responses
+    """
     notification_system = 'pagerduty'
     responses = []
 
