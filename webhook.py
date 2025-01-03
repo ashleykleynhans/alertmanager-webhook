@@ -200,7 +200,7 @@ def parse_alert_message(notification_system: str, title: str, message: str) -> s
 
 
 def parse_alert(alert: Dict[str, Any], notification_system: str)\
-        -> Tuple[Optional[str], Optional[str],Optional[str], Optional[str], Optional[str]]:
+        -> Tuple[Optional[str], Optional[str],Optional[str], Optional[str], Optional[str], Optional[str]]:
     """
     Parse alert data into a formatted message.
 
@@ -215,6 +215,7 @@ def parse_alert(alert: Dict[str, Any], notification_system: str)\
             - hostname: Source hostname
             - status: Alert status
             - application: Application name
+            - environment: Environment name
     """
     title = alert['status'].upper()
     description = ''
@@ -223,7 +224,7 @@ def parse_alert(alert: Dict[str, Any], notification_system: str)\
 
     # Ignore the Watchdog alert
     if 'alertname' in alert['labels'] and alert['labels']['alertname'] == 'Watchdog':
-        return None, None, None, None, None
+        return None, None, None, None, None, None
 
     if 'environment' in alert['labels']:
         description += parse_alert_message(
@@ -310,7 +311,26 @@ def parse_alert(alert: Dict[str, Any], notification_system: str)\
             correct_date
         )
 
-    return title, description, hostname, status, application
+    # Fall back to default environment if no environment is found in the alert
+    if 'environment' not in alert['labels']:
+        logging.info('[DISCORD]: No environment label, falling back to default environment')
+        environment = config['default_environment']
+    else:
+        environment = alert['labels']['environment']
+
+        # Check for partial environment match if the full environment is not matched
+        if environment not in config['valid_environments']:
+            for env in config['environment_mapping']:
+                if env in environment:
+                    environment = config['environment_mapping'][env]
+
+        # No valid environment found in the alert, use the default instead
+        if environment not in config['valid_environments']:
+            logging.info('[DISCORD]: Invalid environment, falling back to default environment')
+            environment = config['default_environment']
+
+
+    return title, description, hostname, status, application, environment
 
 
 def discord_handler(severity: str):
@@ -338,29 +358,11 @@ def discord_handler(severity: str):
     responses: List[Dict[str, Any]] = []
 
     for alert in payload['alerts']:
-        title, description, hostname, status, application = parse_alert(alert, notification_system)
+        title, description, hostname, status, application, environment = parse_alert(alert, notification_system)
 
         if title is None and description is None:
             logging.info('[DISCORD]: No title or description, no notification will be sent')
             continue
-
-        # environment label must be present
-        if 'environment' not in alert['labels']:
-            logging.info('[DISCORD]: No environment label, no notification will be sent')
-            continue
-
-        environment = alert['labels']['environment']
-
-        # Check for partial environment match if the full environment is not matched
-        if environment not in config['valid_environments']:
-            for env in config['environment_mapping']:
-                if env in environment:
-                    environment = config['environment_mapping'][env]
-
-        # No valid environment found in the alert, use the default instead
-        if environment not in config['valid_environments']:
-            logging.info('[DISCORD]: Invalid environment, falling back to default environment')
-            environment = config['default_environment']
 
         discord_config = config[notification_system]['environments'][environment][severity]
         channel_id: str = discord_config['channel_id']
@@ -461,29 +463,11 @@ def telegram_handler(severity: str):
     responses = []
 
     for alert in payload['alerts']:
-        title, description, hostname, status, application = parse_alert(alert, notification_system)
+        title, description, hostname, status, application, environment = parse_alert(alert, notification_system)
 
         if title is None and description is None:
             logging.info('[TELEGRAM]: No title or description, no notification will be sent')
             continue
-
-        # environment label must be present
-        if 'environment' not in alert['labels']:
-            logging.info('[TELEGRAM]: No environment label, no notification will be sent')
-            continue
-
-        environment = alert['labels']['environment']
-
-        # Check for partial environment match if the full environment is not matched
-        if environment not in config['valid_environments']:
-            for env in config['environment_mapping']:
-                if env in environment:
-                    environment = config['environment_mapping'][env]
-
-        # No valid environment found in the alert, use the default instead
-        if environment not in config['valid_environments']:
-            logging.info('[TELEGRAM]: Invalid environment, falling back to default environment')
-            environment = config['default_environment']
 
         if environment not in config[notification_system]['environments']:
             continue
@@ -557,15 +541,10 @@ def pagerduty_handler(severity: str):
     url = 'https://events.pagerduty.com/v2/enqueue'
 
     for alert in payload['alerts']:
-        title, description, hostname, status, application = parse_alert(alert, notification_system)
+        title, description, hostname, status, application, environment = parse_alert(alert, notification_system)
 
         if title is None and description is None:
             logging.info('[PAGERDUTY]: No title or description, no notification will be sent')
-            continue
-
-        # environment label must be present
-        if 'environment' not in alert['labels']:
-            logging.info('[PAGERDUTY]: No environment label, no notification will be sent')
             continue
 
         # Only continue if there is a new alert that is firing
@@ -575,19 +554,6 @@ def pagerduty_handler(severity: str):
         else:
             logging.info('[PAGERDUTY]: Status is not firing, no incident will be triggered')
             continue
-
-        environment = alert['labels']['environment']
-
-        # Check for partial environment match if the full environment is not matched
-        if environment not in config['valid_environments']:
-            for env in config['environment_mapping']:
-                if env in environment:
-                    environment = config['environment_mapping'][env]
-
-        # No valid environment found in the alert, use the default instead
-        if environment not in config['valid_environments']:
-            logging.info('[PAGERDUTY]: Invalid environment, falling back to default environment')
-            environment = config['default_environment']
 
         logging.debug(f'[PAGERDUTY]: Environment: {environment}')
 
