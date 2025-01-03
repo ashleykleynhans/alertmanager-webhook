@@ -15,7 +15,7 @@ import time
 import logging
 import logging.handlers
 from dateutil import parser
-from typing import Dict, List, Tuple, Optional, Any, Union
+from typing import Dict, List, Tuple, Optional, Any
 from flask import Flask, request, jsonify, make_response
 
 log_level: int = logging.DEBUG
@@ -121,16 +121,25 @@ def validate_config(conf: Optional[Dict[str, Any]]) -> None:
         for env in conf['discord']['environments']:
             for severity in conf['discord']['environments'][env]:
                 if 'channel_id' not in conf['discord']['environments'][env][severity]:
-                    raise KeyError(f'"channel_id" not found for severity {severity} for the {env} environment for Discord in config.yml')
+                    raise KeyError(
+                        f'"channel_id" not found for severity {severity} for the {env} environment for Discord in '
+                        'config.yml'
+                    )
 
                 if 'author' not in conf['discord']['environments'][env][severity]:
-                    raise KeyError(f'"author" not found for severity {severity} for the {env} environment for Discord in config.yml')
+                    raise KeyError(
+                        f'"author" not found for severity {severity} for the {env} environment for Discord in '
+                        'config.yml'
+                    )
 
     if 'telegram' in conf:
         for env in conf['telegram']['environments']:
             for severity in conf['telegram']['environments'][env]:
                 if 'chat_id' not in conf['telegram']['environments'][env][severity]:
-                    raise KeyError(f'"chat_id" not found for severity {severity} for the {env} environment for Telegram in config.yml')
+                    raise KeyError(
+                        f'"chat_id" not found for severity {severity} for the {env} environment for Telegram in '
+                        'config.yml'
+                    )
 
     if 'valid_environments' not in conf:
         raise KeyError('"valid_environments" not found in config.yml')
@@ -199,8 +208,17 @@ def parse_alert_message(notification_system: str, title: str, message: str) -> s
         return f'{title}: {message}'
 
 
-def parse_alert(alert: Dict[str, Any], notification_system: str)\
-        -> Tuple[Optional[str], Optional[str],Optional[str], Optional[str], Optional[str], Optional[str]]:
+def parse_alert(
+    alert: Dict[str, Any],
+    notification_system: str
+) -> Tuple[
+    Optional[str],
+    Optional[str],
+    Optional[str],
+    Optional[str],
+    Optional[str],
+    Optional[str]
+]:
     """
     Parse alert data into a formatted message.
 
@@ -221,6 +239,7 @@ def parse_alert(alert: Dict[str, Any], notification_system: str)\
     description = ''
     hostname = ''
     application = ''
+    runbook_url = ''
 
     # Ignore the Watchdog alert
     if 'alertname' in alert['labels'] and alert['labels']['alertname'] == 'Watchdog':
@@ -287,6 +306,13 @@ def parse_alert(alert: Dict[str, Any], notification_system: str)\
             f"{alert['annotations']['description']}\n"
         )
 
+    if 'runbook_url' in alert['annotations']:
+        description += parse_alert_message(
+            notification_system,
+            'Runbook URL',
+            f"{alert['annotations']['runbook_url']}\n"
+        )
+
     if 'log' in alert['labels']:
         description += parse_alert_message(
             notification_system,
@@ -328,7 +354,6 @@ def parse_alert(alert: Dict[str, Any], notification_system: str)\
         if environment not in config['valid_environments']:
             logging.info('[DISCORD]: Invalid environment, falling back to default environment')
             environment = config['default_environment']
-
 
     return title, description, hostname, status, application, environment
 
@@ -372,15 +397,15 @@ def discord_handler(severity: str):
 
         if alert['status'] == 'firing':
             if severity == 'critical':
-                color = '#E01E5A'   # Red - Critical
+                color = '#E01E5A'  # Red - Critical
             elif severity == 'warning':
-                color = '#ECB22E'   # Yellow - Warning
+                color = '#ECB22E'  # Yellow - Warning
             elif severity == 'info':
-                color = '#36C5F0'   # Blue - Info
+                color = '#36C5F0'  # Blue - Info
             else:
-                color = '#ECB22E'   # Default to yellow if severity unknown
+                color = '#ECB22E'  # Default to yellow if severity unknown
         else:
-            color = '#2EB67D'       # Green - Resolved
+            color = '#2EB67D'      # Green - Resolved
 
         color = color[1:]
         color = int(color, 16)
