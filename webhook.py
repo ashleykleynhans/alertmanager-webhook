@@ -5,6 +5,7 @@ Handles incoming webhooks from Alertmanager and routes them to appropriate notif
 """
 
 import json
+import html
 import re
 import sys
 import argparse
@@ -311,7 +312,7 @@ def parse_alert(
         description += parse_alert_message(
             notification_system,
             'Description',
-            f"{alert['annotations']['description']}\n"
+            f"{html.escape(alert['annotations']['description'])}\n"
         )
 
     if 'runbook_url' in alert['annotations']:
@@ -362,6 +363,9 @@ def parse_alert(
         if environment not in config['valid_environments']:
             logging.info('[DISCORD]: Invalid environment, falling back to default environment')
             environment = config['default_environment']
+
+    # replace HTTPS in title with empty string
+    title = title.replace('HTTPS://', '')
 
     return title, description, hostname, status, application, environment, severity
 
