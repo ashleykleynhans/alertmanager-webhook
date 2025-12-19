@@ -19,6 +19,9 @@ from dateutil import parser
 from typing import Dict, List, Tuple, Optional, Any
 from flask import Flask, request, jsonify, make_response
 
+VERSION: str = '1.4.0'
+USER_AGENT: str = f'Alertmanager-Webhook/{VERSION}'
+
 log_level: int = logging.DEBUG
 log_path: str = ''
 
@@ -441,7 +444,8 @@ def discord_handler(default_severity: str):
             url=bot_url,
             headers={
                 'Content-Type': 'application/json',
-                'Authorization': f'Bot {bot_token}'
+                'Authorization': f'Bot {bot_token}',
+                'User-Agent': USER_AGENT
             },
             json={
                 'embeds': embeds
@@ -459,7 +463,8 @@ def discord_handler(default_severity: str):
                 url=bot_url,
                 headers={
                     'Content-Type': 'application/json',
-                    'Authorization': f'Bot {bot_token}'
+                    'Authorization': f'Bot {bot_token}',
+                    'User-Agent': USER_AGENT
                 },
                 json={
                     'embeds': embeds
@@ -520,6 +525,7 @@ def telegram_handler(default_severity: str):
 
         response = requests.post(
             url=bot_url,
+            headers={'User-Agent': USER_AGENT},
             data={
                 'chat_id': chat_id,
                 'parse_mode': 'html',
@@ -536,6 +542,7 @@ def telegram_handler(default_severity: str):
 
             response = requests.post(
                 url=bot_url,
+                headers={'User-Agent': USER_AGENT},
                 data={
                     'chat_id': chat_id,
                     'parse_mode': 'html',
@@ -641,6 +648,7 @@ def pagerduty_handler(default_severity: str):
 
         response = requests.post(
             url=url,
+            headers={'User-Agent': USER_AGENT},
             data=json.dumps(payload)
         )
 
@@ -653,6 +661,7 @@ def pagerduty_handler(default_severity: str):
 
             response = requests.post(
                 url=url,
+                headers={'User-Agent': USER_AGENT},
                 data=json.dumps(payload)
             )
 
