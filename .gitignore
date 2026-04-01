@@ -1,7 +1,11 @@
 *.json
 venv/*
+.venv/*
 .vscode
 .idea
 config.yml
-test*
+/test*
+!tests/
 .DS_Store
+.coverage
+__pycache__/

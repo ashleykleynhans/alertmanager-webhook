@@ -169,7 +169,7 @@ def substitute_hyperlinks(text: str, link_format: str = 'html') -> str:
     Raises:
         Exception: If link_format is not supported
     """
-    pattern = '(<(https?:\/\/.*?)\|(.*?)>)'
+    pattern = r'(<(https?:\/\/.*?)\|(.*?)>)'
     matches = re.findall(pattern, text)
 
     if matches:
@@ -436,7 +436,7 @@ def discord_handler(default_severity: str):
                     'icon_url': icon_url
                 },
                 'color': color,
-                'timestamp': datetime.datetime.utcnow().isoformat()
+                'timestamp': datetime.datetime.now(datetime.UTC).isoformat()
             }
         ]
 
@@ -596,12 +596,14 @@ def pagerduty_handler(default_severity: str):
             logging.info('[PAGERDUTY]: No title or description, no notification will be sent')
             continue
 
-        # Only continue if there is a new alert that is firing
         if status == 'firing':
             logging.info('[PAGERDUTY]: Status is firing, incident will be triggered')
             event_action = 'trigger'
+        elif status == 'resolved':
+            logging.info('[PAGERDUTY]: Status is resolved, incident will be resolved')
+            event_action = 'resolve'
         else:
-            logging.info('[PAGERDUTY]: Status is not firing, no incident will be triggered')
+            logging.info(f'[PAGERDUTY]: Status is {status}, no action will be taken')
             continue
 
         logging.debug(f'[PAGERDUTY]: Environment: {environment}')
@@ -636,6 +638,8 @@ def pagerduty_handler(default_severity: str):
         if not len(hostname):
             hostname = 'none'
 
+        dedup_key = alert.get('fingerprint', '')
+
         payload = {
             'payload': {
                 'summary': message,
@@ -643,7 +647,8 @@ def pagerduty_handler(default_severity: str):
                 'source': hostname
             },
             'routing_key': routing_key,
-            'event_action': event_action
+            'event_action': event_action,
+            'dedup_key': dedup_key
         }
 
         response = requests.post(

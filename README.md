@@ -149,8 +149,8 @@ while ngrok is running **(be sure to use the https one)**.
 
 1. Create a Python 3.12 Virtual Environment:
 ```bash
-python3 -m venv venv/py3.12
-source venv/py3.12/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 2. Upgrade pip.
 ```bash
