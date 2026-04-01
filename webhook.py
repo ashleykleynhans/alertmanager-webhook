@@ -19,7 +19,7 @@ from dateutil import parser
 from typing import Dict, List, Tuple, Optional, Any
 from flask import Flask, request, jsonify, make_response
 
-VERSION: str = '1.4.0'
+VERSION: str = '1.5.0'
 USER_AGENT: str = f'Alertmanager-Webhook/{VERSION}'
 
 log_level: int = logging.DEBUG
