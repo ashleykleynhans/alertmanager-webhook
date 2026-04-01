@@ -6,6 +6,9 @@ https://img.shields.io/badge/Python%20application-v3.12-blue
 [![License: GPL 3.0](
 https://img.shields.io/github/license/ashleykleynhans/alertmanager-webhook
 )](https://opensource.org/licenses/GPL-3.0)
+[![Tests](
+https://github.com/ashleykleynhans/alertmanager-webhook/actions/workflows/tests.yml/badge.svg
+)](https://github.com/ashleykleynhans/alertmanager-webhook/actions/workflows/tests.yml)
 
 ## Prerequisites
 
