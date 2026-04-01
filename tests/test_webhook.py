@@ -830,4 +830,12 @@ class TestModuleLevel:
 
     def test_non_linux_platform_log_path(self) -> None:
         """Log path is empty on non-Linux platforms."""
-        assert webhook.log_path == ''
+        original = sys.modules.pop('webhook')
+        try:
+            builtins.open = config_open
+            with patch('sys.platform', 'darwin'):
+                wh = importlib.import_module('webhook')
+                assert wh.log_path == ''
+        finally:
+            builtins.open = real_open
+            sys.modules['webhook'] = original
