@@ -221,6 +221,17 @@ You should expect the following response:
 zappa tail
 ```
 
+## Running Tests
+
+1. Install the dependencies (if you haven't already):
+```bash
+pip3 install -r requirements.txt
+```
+2. Run the tests:
+```bash
+pytest -v
+```
+
 ## Community and Contributing
 
 Pull requests and issues on [GitHub](https://github.com/ashleykleynhans/alertmanager-webhook)
